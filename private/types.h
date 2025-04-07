@@ -7,6 +7,9 @@
 #define REG_ACCEL_XOUT_H 0x3b
 #define REG_ACCEL_XOUT_L 0x3c
 
+#define REG_GYRO_XOUT_H 0x43
+#define REG_GYRO_XOUT_L 0x44
+
 #define REG_PWR_MGMT_1 0x6B
 
 #endif  // MPU60X0_TYPES_H

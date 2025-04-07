@@ -8,6 +8,7 @@
 #include "mpu60x0.h"
 #include "unity.h"
 #include "esp_log.h"
+#include <array>
 
 static void init(i2c_master_bus_handle_t* out) {
   i2c_master_bus_config_t i2c_mst_config = {};
@@ -57,6 +58,35 @@ TEST_CASE("ACCEL X", "[mpu]") {
 
     int16_t o;
     TEST_ASSERT_EQUAL(ESP_OK, mpu.readAccX(&o));
+    ESP_LOGI("[mpu]", "reading value: %d", o);    
+  }
+
+  i2c_del_master_bus(bus_handle);
+}
+
+TEST_CASE("GYRO", "[mpu]") {
+  i2c_master_bus_handle_t bus_handle;
+  init(&bus_handle);
+  
+  {
+    Mpu mpu(bus_handle);
+    std::array<int16_t, 3> out = {-1, -1, -1};
+    TEST_ASSERT_EQUAL(ESP_OK, mpu.getRawGyro(&out));
+    ESP_LOGI("mpu", "out: %d, %d, %d", out[0], out[1], out[2]);
+  }
+
+  i2c_del_master_bus(bus_handle);
+}
+
+TEST_CASE("GYRO X", "[mpu]") {
+  i2c_master_bus_handle_t bus_handle;
+  init(&bus_handle);
+  
+  {
+    Mpu mpu(bus_handle);
+    int16_t out;
+    TEST_ASSERT_EQUAL(ESP_OK, mpu.getRawGyroX(&out));
+    ESP_LOGI("mpu", "out: %d", out);
   }
 
   i2c_del_master_bus(bus_handle);  
