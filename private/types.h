@@ -1,0 +1,12 @@
+#ifndef MPU60X0_TYPES_H
+#define MPU60X0_TYPES_H
+
+#define MPU60X0_ADDR0 0x68
+#define MPU60X0_ADDR1 0x69
+
+#define REG_ACCEL_XOUT_H 0x3b
+#define REG_ACCEL_XOUT_L 0x3c
+
+#define REG_PWR_MGMT_1 0x6B
+
+#endif  // MPU60X0_TYPES_H
