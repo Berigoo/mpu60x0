@@ -21,7 +21,8 @@ private:
 
   float m_gyroSens = 131.0f;	// LSB / deg/s
   float m_accSens = 16384.0f;	// LSB / g
-  uint64_t m_lastUpdateTime = 0; 	// us
+  uint64_t m_lastUpdateTime = 0; // us
+  float m_filterTargetDelay = 0;
   struct {
     float x = -0.27f, y = 0.24f, z = 0.16f; // deg/s
   } m_offsetGyro;

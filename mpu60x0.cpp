@@ -25,16 +25,17 @@ Mpu::Mpu(i2c_master_bus_handle_t masterBusHandle, uint32_t masterFreq,
   ESP_ERROR_CHECK(i2c_master_bus_add_device(
       masterBusHandle, &conf, &m_handle));
 
-  // setting filter
-  Madgwick *f = new Madgwick(filterPollFreqs, filterBeta);
-  // f->begin(100.0f);
-  m_madgwickFilter = f;
+  m_madgwickFilter = new Madgwick(filterPollFreqs, filterBeta);
 
-  // Reset
-  uint8_t data[] = {REG_PWR_MGMT_1, 0b10000000};
+  m_filterTargetDelay = 1000000 / filterPollFreqs;
+
+  // reset
+  uint8_t data[] = {REG_PWR_MGMT_1, 0xF0};
   ESP_ERROR_CHECK(
       i2c_master_transmit(m_handle, data, 2, 1000 / portTICK_PERIOD_MS));
   vTaskDelay(200 / portTICK_PERIOD_MS);
+  
+  // wakeup
   data[0] = REG_PWR_MGMT_1;
   data[1] = 0x0;		// TODO store device state
   ESP_ERROR_CHECK(
@@ -195,9 +196,8 @@ void Mpu::calibrateGyro() {
 void Mpu::update() {
   uint64_t now_us = esp_timer_get_time();
   uint64_t dt = now_us - m_lastUpdateTime;
-  const float min_delay = 1000000 / 512.0f; // TODO dyn
 
-  if (dt < min_delay)
+  if (dt < m_filterTargetDelay)
     return;
 
   std::array<int16_t, 3> g;
