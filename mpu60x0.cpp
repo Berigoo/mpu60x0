@@ -9,16 +9,12 @@
 #include "private/MadgwickAHRS.h"
 #include <array>
 #include <cstdint>
-#include <cstdlib>
-#include <limits>
-#include <vector>
 #include "esp_timer.h"
 #include "esp_log.h"
-#define _USE_MATH_DEFINES
-#include <math.h>
 
-Mpu::Mpu(i2c_master_bus_handle_t masterBusHandle,
-         bool useAlternativeAddr, uint32_t masterFreq){
+Mpu::Mpu(i2c_master_bus_handle_t masterBusHandle, uint32_t masterFreq,
+	 bool useAlternativeAddr, float filterPollFreqs,
+	 float filterBeta) {
   uint16_t addr = (useAlternativeAddr) ? MPU60X0_ADDR1 : MPU60X0_ADDR0;
 
   i2c_device_config_t conf = {};
@@ -30,7 +26,7 @@ Mpu::Mpu(i2c_master_bus_handle_t masterBusHandle,
       masterBusHandle, &conf, &m_handle));
 
   // setting filter
-  Madgwick *f = new Madgwick();
+  Madgwick *f = new Madgwick(filterPollFreqs, filterBeta);
   // f->begin(100.0f);
   m_madgwickFilter = f;
 
@@ -137,6 +133,8 @@ esp_err_t Mpu::setAccScale(mpu::accScale scale) {
 }
 
 void Mpu::calibrateGyro() {
+  ESP_LOGI("mpu", "calibrating...");
+  
   float sumGyroX = 0.0f, sumGyroY = 0.0f, sumGyroZ = 0.0f;
   float sumAccX = 0.0f, sumAccY = 0.0f, sumAccZ = 0.0f;
   const int samples = 200;
@@ -191,45 +189,8 @@ void Mpu::calibrateGyro() {
   m_offsetAcc.y = sqrt(asd[1] / (samples));
   m_offsetAcc.z = sqrt(asd[2] / (samples));
 
-  ESP_LOGI("calibration", "res: %f, %f, %f", m_offsetGyro.x, m_offsetGyro.y,
-           m_offsetGyro.z);
-  ESP_LOGI("calibration", "res: %f, %f, %f", m_offsetAcc.x, m_offsetAcc.y,
-           m_offsetAcc.z);
-  ESP_LOGI("calibration", "res: %f, %f", gsd[1], asd[1]);
-  
+  ESP_LOGI("mpu", "calibrated");	       
 }
-
-// esp_err_t Mpu::getGyro(std::array<float, 3> *out) {
-//   uint8_t buf[6];
-//   uint8_t reg = REG_GYRO_XOUT_H;
-  
-//   esp_err_t r = i2c_master_transmit_receive(m_handle, &reg, 1, buf, 6,
-//                                             1000 / portTICK_PERIOD_MS);
-//   if (r != ESP_OK)
-//     return r;
-
-//   out->at(0) = (uint16_t((buf[0] << 8) | buf[1]) / m_gyroSens) - m_offsetGyro.x;
-//   out->at(1) = (uint16_t((buf[2] << 8) | buf[3]) / m_gyroSens) - m_offsetGyro.y;
-//   out->at(2) = (uint16_t((buf[4] << 8) | buf[5]) / m_gyroSens) - m_offsetGyro.z;
-
-//   return ESP_OK;
-// }
-
-// esp_err_t Mpu::readGyro(std::array<float, 3> *out) {
-//   uint8_t buf[6];
-//   uint8_t reg = REG_GYRO_XOUT_H;
-  
-//   esp_err_t r = i2c_master_transmit_receive(m_handle, &reg, 1, buf, 6,
-//                                             1000 / portTICK_PERIOD_MS);
-//   if (r != ESP_OK)
-//     return r;
-
-//   out->at(0) = (uint16_t((buf[0] << 8) | buf[1]) / m_gyroSens);
-//   out->at(1) = (uint16_t((buf[2] << 8) | buf[3]) / m_gyroSens);
-//   out->at(2) = (uint16_t((buf[4] << 8) | buf[5]) / m_gyroSens);
-
-//   return ESP_OK;  
-// }
 
 void Mpu::update() {
   uint64_t now_us = esp_timer_get_time();
