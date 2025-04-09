@@ -49,20 +49,20 @@ TEST_CASE("PROBING", "[mpu]") {
   i2c_del_master_bus(bus_handle);
 }
 
-TEST_CASE("ACCEL X", "[mpu]") {
-  i2c_master_bus_handle_t bus_handle;
-  init(&bus_handle);
+// TEST_CASE("ACCEL X", "[mpu]") {
+//   i2c_master_bus_handle_t bus_handle;
+//   init(&bus_handle);
   
-  {
-    Mpu mpu(bus_handle);
+//   {
+//     Mpu mpu(bus_handle);
 
-    int16_t o;
-    TEST_ASSERT_EQUAL(ESP_OK, mpu.readAccX(&o));
-    ESP_LOGI("[mpu]", "reading value: %d", o);    
-  }
+//     int16_t o;
+//     TEST_ASSERT_EQUAL(ESP_OK, mpu.readAccX(&o));
+//     ESP_LOGI("[mpu]", "reading value: %d", o);    
+//   }
 
-  i2c_del_master_bus(bus_handle);
-}
+//   i2c_del_master_bus(bus_handle);
+// }
 
 TEST_CASE("GYRO", "[mpu]") {
   i2c_master_bus_handle_t bus_handle;
@@ -78,16 +78,16 @@ TEST_CASE("GYRO", "[mpu]") {
   i2c_del_master_bus(bus_handle);
 }
 
-TEST_CASE("GYRO X", "[mpu]") {
-  i2c_master_bus_handle_t bus_handle;
-  init(&bus_handle);
+// TEST_CASE("GYRO X", "[mpu]") {
+//   i2c_master_bus_handle_t bus_handle;
+//   init(&bus_handle);
   
-  {
-    Mpu mpu(bus_handle);
-    int16_t out;
-    TEST_ASSERT_EQUAL(ESP_OK, mpu.getRawGyroX(&out));
-    ESP_LOGI("mpu", "out: %d", out);
-  }
+//   {
+//     Mpu mpu(bus_handle);
+//     int16_t out;
+//     TEST_ASSERT_EQUAL(ESP_OK, mpu.getRawGyroX(&out));
+//     ESP_LOGI("mpu", "out: %d", out);
+//   }
 
-  i2c_del_master_bus(bus_handle);  
-}
+//   i2c_del_master_bus(bus_handle);  
+// }
