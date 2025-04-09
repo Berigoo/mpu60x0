@@ -39,7 +39,7 @@ public:
   
   ~Mpu();
 
-  void calibrateGyro();
+  void calibrate();
   void update();
 
   i2c_master_dev_handle_t getHandle() { return m_handle; };

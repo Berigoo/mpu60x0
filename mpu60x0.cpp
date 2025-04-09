@@ -40,7 +40,7 @@ Mpu::Mpu(i2c_master_bus_handle_t masterBusHandle, uint32_t masterFreq,
   data[1] = 0x0;		// TODO store device state
   ESP_ERROR_CHECK(
       i2c_master_transmit(m_handle, data, 2, 1000 / portTICK_PERIOD_MS));
-  calibrateGyro();
+  calibrate();
 }
 
 Mpu::~Mpu() {
@@ -58,9 +58,9 @@ esp_err_t Mpu::getRawGyro(std::array<int16_t, 3> *out) {
   if (r != ESP_OK)
     return r;
 
-  out->at(0) = uint16_t((buf[0] << 8) | buf[1]);
-  out->at(1) = uint16_t((buf[2] << 8) | buf[3]);
-  out->at(2) = uint16_t((buf[4] << 8) | buf[5]);
+  out->at(0) = int16_t((buf[0] << 8) | buf[1]);
+  out->at(1) = int16_t((buf[2] << 8) | buf[3]);
+  out->at(2) = int16_t((buf[4] << 8) | buf[5]);
   
   return ESP_OK;    
 };
@@ -73,22 +73,22 @@ esp_err_t Mpu::setGyroScale(mpu::gyroScale scale) {
   case mpu::gyroScale::FS_500:
     data[1] = FS_SEL_500;
     r = i2c_master_transmit(m_handle, data, 2, 1000 / portTICK_PERIOD_MS);
-    if (r == ESP_OK)  m_gyroSens = 500.0f;
+    if (r == ESP_OK)  m_gyroSens = 65.5f;
     break;
   case mpu::gyroScale::FS_1000:
     data[1] = FS_SEL_1000;
     r = i2c_master_transmit(m_handle, data, 2, 1000 / portTICK_PERIOD_MS);
-    if (r == ESP_OK)  m_gyroSens = 1000.0f;
+    if (r == ESP_OK)  m_gyroSens = 32.8f;
     break;
   case mpu::gyroScale::FS_2000:
     data[1] = FS_SEL_2000;
     r = i2c_master_transmit(m_handle, data, 2, 1000 / portTICK_PERIOD_MS);
-    if (r == ESP_OK) m_gyroSens = 2000.0f;
+    if (r == ESP_OK) m_gyroSens = 16.4f;
     break;
   default:
     data[1] = FS_SEL_250;
     r = i2c_master_transmit(m_handle, data, 2, 1000 / portTICK_PERIOD_MS);
-    if (r == ESP_OK) m_gyroSens = 250.0f;
+    if (r == ESP_OK) m_gyroSens = 131.0f;
     break;
   }
   
@@ -111,55 +111,55 @@ esp_err_t Mpu::setAccScale(mpu::accScale scale) {
   case mpu::accScale::FS_4:
     data[1] = FS_SEL_4;
     r = i2c_master_transmit(m_handle, data, 2, 1000 / portTICK_PERIOD_MS);
-    if (r == ESP_OK)  m_accSens = 4.0f;
+    if (r == ESP_OK)  m_accSens = 8192.0f;
     break;
   case mpu::accScale::FS_8:
     data[1] = FS_SEL_8;
     r = i2c_master_transmit(m_handle, data, 2, 1000 / portTICK_PERIOD_MS);
-    if (r == ESP_OK)  m_accSens = 8.0f;
+    if (r == ESP_OK)  m_accSens = 4096.0f; 
     break;
   case mpu::accScale::FS_16:
     data[1] = FS_SEL_16;
     r = i2c_master_transmit(m_handle, data, 2, 1000 / portTICK_PERIOD_MS);
-    if (r == ESP_OK) m_accSens = 16.0f;
+    if (r == ESP_OK) m_accSens = 2048.0f;
     break;
   default:
     data[1] = FS_SEL_2;
     r = i2c_master_transmit(m_handle, data, 2, 1000 / portTICK_PERIOD_MS);
-    if (r == ESP_OK) m_accSens = 2.0f;
+    if (r == ESP_OK) m_accSens = 16384.0f;
     break;
   }
   
   return r;
 }
 
-void Mpu::calibrateGyro() {
+void Mpu::calibrate(){
   ESP_LOGI("mpu", "calibrating...");
   
   float sumGyroX = 0.0f, sumGyroY = 0.0f, sumGyroZ = 0.0f;
   float sumAccX = 0.0f, sumAccY = 0.0f, sumAccZ = 0.0f;
   const int samples = 200;
-  std::array<std::array<int16_t, 3>, samples> gi; // TODO
-  std::array<std::array<int16_t, 3>, samples> ai;  
+  auto gi = new std::array<std::array<int16_t, 3>, samples>{};
+  auto ai = new std::array<std::array<int16_t, 3>, samples> {};  
 
   for (int i = 0; i < samples; i++) {
-    ESP_ERROR_CHECK(getRawGyro(&gi[i]));
-    gi[i][0] = convertGyro(gi[i][0]);
-    gi[i][1] = convertGyro(gi[i][1]);
-    gi[i][2] = convertGyro(gi[i][2]);
+    ESP_ERROR_CHECK(getRawGyro(&gi->at(i)));
+    gi->at(i)[0] = convertGyro(gi->at(i)[0]);
+    gi->at(i)[1] = convertGyro(gi->at(i)[1]);
+    gi->at(i)[2] = convertGyro(gi->at(i)[2]);
     
-    ESP_ERROR_CHECK(getRawAcc(&ai[i]));
-    ai[i][0] = convertAcc(ai[i][0]);
-    ai[i][1] = convertAcc(ai[i][1]);
-    ai[i][2] = convertAcc(ai[i][2]);
+    ESP_ERROR_CHECK(getRawAcc(&ai->at(i)));
+    ai->at(i)[0] = convertAcc(ai->at(i)[0]);
+    ai->at(i)[1] = convertAcc(ai->at(i)[1]);
+    ai->at(i)[2] = convertAcc(ai->at(i)[2]);
 
-    sumGyroX += gi[i][0];
-    sumGyroY += gi[i][1];
-    sumGyroZ += gi[i][2];
+    sumGyroX += gi->at(i)[0];
+    sumGyroY += gi->at(i)[1];
+    sumGyroZ += gi->at(i)[2];
     
-    sumAccX += ai[i][0];
-    sumAccY += ai[i][1];
-    sumAccZ += ai[i][2];    
+    sumAccX += ai->at(i)[0];
+    sumAccY += ai->at(i)[1];
+    sumAccZ += ai->at(i)[2];    
     vTaskDelay(1 / portTICK_PERIOD_MS);
   }
 
@@ -173,13 +173,13 @@ void Mpu::calibrateGyro() {
   
   std::array<float, 3> gsd = {0,0,0}, asd={0,0,0};
   for (int i=0; i < samples; i++) {
-    gsd[0] += pow(gi[i][0] - sumGyroX, 2);
-    gsd[1] += pow(gi[i][1] - sumGyroY, 2);
-    gsd[2] += pow(gi[i][2] - sumGyroZ, 2);
+    gsd[0] += pow(gi->at(i)[0] - sumGyroX, 2);
+    gsd[1] += pow(gi->at(i)[1] - sumGyroY, 2);
+    gsd[2] += pow(gi->at(i)[2] - sumGyroZ, 2);
 
-    asd[0] += pow(ai[i][0] - sumAccX, 2);
-    asd[1] += pow(ai[i][1] - sumAccY, 2);
-    asd[2] += pow(ai[i][2] - sumAccZ, 2);    
+    asd[0] += pow(ai->at(i)[0] - sumAccX, 2);
+    asd[1] += pow(ai->at(i)[1] - sumAccY, 2);
+    asd[2] += pow(ai->at(i)[2] - sumAccZ, 2);    
   }
   
   m_offsetGyro.x = sqrt(gsd[0] / (samples));
@@ -190,6 +190,9 @@ void Mpu::calibrateGyro() {
   m_offsetAcc.y = sqrt(asd[1] / (samples));
   m_offsetAcc.z = sqrt(asd[2] / (samples));
 
+  delete gi;
+  delete ai;
+  
   ESP_LOGI("mpu", "calibrated");	       
 }
 
@@ -227,9 +230,9 @@ esp_err_t Mpu::getRawAcc(std::array<int16_t, 3> *out) {
   if (r != ESP_OK)
     return r;
 
-  out->at(0) = uint16_t((buf[0] << 8) | buf[1]);
-  out->at(1) = uint16_t((buf[2] << 8) | buf[3]);
-  out->at(2) = uint16_t((buf[4] << 8) | buf[5]);
+  out->at(0) = int16_t((buf[0] << 8) | buf[1]);
+  out->at(1) = int16_t((buf[2] << 8) | buf[3]);
+  out->at(2) = int16_t((buf[4] << 8) | buf[5]);
   
   return ESP_OK;
 }
