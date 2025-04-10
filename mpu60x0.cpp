@@ -1,5 +1,6 @@
 #include "include/mpu60x0.h"
 #include "driver/i2c_master.h"
+#include "driver/i2c_types.h"
 #include "esp_err.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/idf_additions.h"
@@ -30,14 +31,16 @@ Mpu::Mpu(i2c_master_bus_handle_t masterBusHandle, uint32_t masterFreq,
   m_filterTargetDelay = 1000000 / filterPollFreqs;
 
   // reset
-  uint8_t data[] = {REG_PWR_MGMT_1, 0xF0};
+  m_statePWR_MGMT_1 = 0xF0;
+  uint8_t data[] = {REG_PWR_MGMT_1, m_statePWR_MGMT_1};
   ESP_ERROR_CHECK(
       i2c_master_transmit(m_handle, data, 2, 1000 / portTICK_PERIOD_MS));
   vTaskDelay(200 / portTICK_PERIOD_MS);
-  
+
   // wakeup
+  m_statePWR_MGMT_1 = 0x0;
   data[0] = REG_PWR_MGMT_1;
-  data[1] = 0x0;		// TODO store device state
+  data[1] = m_statePWR_MGMT_1;
   ESP_ERROR_CHECK(
       i2c_master_transmit(m_handle, data, 2, 1000 / portTICK_PERIOD_MS));
   calibrate();
@@ -203,20 +206,23 @@ void Mpu::update() {
   if (dt < m_filterTargetDelay)
     return;
 
-  std::array<int16_t, 3> g;
-  std::array<int16_t, 3> a;
-  getRawGyro(&g);
-  getRawAcc(&a);
+  if (!(m_statePWR_MGMT_2 & 0x4F)){
+    std::array<int16_t, 3> g;
+    std::array<int16_t, 3> a;
+    getRawGyro(&g);
+    getRawAcc(&a);
 
-  float gx = convertGyro(g[0]) - m_offsetGyro.x;
-  float gy = convertGyro(g[1]) - m_offsetGyro.y;
-  float gz = convertGyro(g[2]) - m_offsetGyro.z;
+    float gx = convertGyro(g[0]) - m_offsetGyro.x;
+    float gy = convertGyro(g[1]) - m_offsetGyro.y;
+    float gz = convertGyro(g[2]) - m_offsetGyro.z;
 
-  float ax = convertAcc(a[0]) - m_offsetAcc.x;
-  float ay = convertAcc(a[1]) - m_offsetAcc.y;
-  float az = convertAcc(a[2]) - m_offsetAcc.z;
+    float ax = convertAcc(a[0]) - m_offsetAcc.x;
+    float ay = convertAcc(a[1]) - m_offsetAcc.y;
+    float az = convertAcc(a[2]) - m_offsetAcc.z;
+    
+    static_cast<Madgwick *>(m_madgwickFilter)->updateIMU(gx, gy, gz, ax, ay, az);
+  }
 
-  static_cast<Madgwick *>(m_madgwickFilter)->updateIMU(gx, gy, gz, ax, ay, az);
 
   m_lastUpdateTime = now_us;
 }
@@ -247,4 +253,151 @@ float Mpu::getPitch() {
 
 float Mpu::getYaw() {
   return static_cast<Madgwick *>(m_madgwickFilter)->getYaw();
+}
+
+esp_err_t Mpu::enableCycleMode(bool v) {
+  if (v) {
+    m_statePWR_MGMT_1 |= PWR_MGMT_CYCLE_MODE;
+  } else {
+    m_statePWR_MGMT_1 &= ~PWR_MGMT_CYCLE_MODE;
+  }
+  uint8_t data[] = {REG_PWR_MGMT_1, m_statePWR_MGMT_1};
+  
+  esp_err_t r =
+      i2c_master_transmit(m_handle, data, 2, 1000 / portTICK_PERIOD_MS);
+
+  return r;
+}
+
+esp_err_t Mpu::enableSleepMode(bool v) {
+  if (v) {
+    m_statePWR_MGMT_1 |= PWR_MGMT_SLEEP_MODE;
+  } else {
+    m_statePWR_MGMT_1 &= ~PWR_MGMT_SLEEP_MODE;
+  }
+  uint8_t data[] = {REG_PWR_MGMT_1, m_statePWR_MGMT_1};
+
+  esp_err_t r =
+      i2c_master_transmit(m_handle, data, 2, 1000 / portTICK_PERIOD_MS);
+
+  return r;  
+}
+
+esp_err_t Mpu::reset() {
+  m_statePWR_MGMT_1 = 0x80;
+  uint8_t data[] = {REG_PWR_MGMT_1, m_statePWR_MGMT_1};
+
+  esp_err_t r =
+      i2c_master_transmit(m_handle, data, 2, 1000 / portTICK_PERIOD_MS);
+
+  if (r != ESP_OK)
+    return r;
+  vTaskDelay(200 / portTICK_PERIOD_MS);
+
+  m_statePWR_MGMT_1 = 0x0;
+  data[1] = m_statePWR_MGMT_1;
+  r = i2c_master_transmit(m_handle, data, 2, 1000 / portTICK_PERIOD_MS);
+  
+  return r;
+}
+
+esp_err_t Mpu::disableTemp(bool v) {
+  if (v) {
+    m_statePWR_MGMT_1 |= PWR_MGMT_DISABLE_TEMP;
+  } else {
+    m_statePWR_MGMT_1 &= ~PWR_MGMT_DISABLE_TEMP;
+  }    
+  uint8_t data[] = {REG_PWR_MGMT_1, m_statePWR_MGMT_1};
+
+  esp_err_t r =
+      i2c_master_transmit(m_handle, data, 2, 1000 / portTICK_PERIOD_MS);
+
+  return r;
+}
+
+esp_err_t Mpu::enableLowPowerMode(mpu::wakeupFreq freq) {
+  m_statePWR_MGMT_1 |=
+      (PWR_MGMT_CYCLE_MODE & ~PWR_MGMT_SLEEP_MODE) | PWR_MGMT_DISABLE_TEMP;
+  switch (freq) {
+  case mpu::wakeupFreq::FS_5_HZ:
+    m_statePWR_MGMT_2 |= PWR_MGMT_WK_FREQ_5;
+    break;
+  case mpu::wakeupFreq::FS_20_HZ:
+    m_statePWR_MGMT_2 |= PWR_MGMT_WK_FREQ_20;
+    break;
+  case mpu::wakeupFreq::FS_40_HZ:
+    m_statePWR_MGMT_2 |= PWR_MGMT_WK_FREQ_40;
+    break;
+  default:
+    m_statePWR_MGMT_2 |= PWR_MGMT_WK_FREQ_1_25;
+  }
+  
+  uint8_t data[] = {REG_PWR_MGMT_1, m_statePWR_MGMT_1, m_statePWR_MGMT_2};
+
+  esp_err_t r =
+      i2c_master_transmit(m_handle, data, 3, 1000 / portTICK_PERIOD_MS);
+
+  return r;  
+}
+
+esp_err_t Mpu::disableGyro(bool v, uint8_t flags) {
+  uint8_t accumulate = 0x0;
+  if (flags & mpu::disableAxis::GYRO_X)
+    accumulate |= mpu::disableAxis::GYRO_X;
+  if (flags & mpu::disableAxis::GYRO_Y)
+    accumulate |= mpu::disableAxis::GYRO_Y;
+  if (flags & mpu::disableAxis::GYRO_Z)
+    accumulate |= mpu::disableAxis::GYRO_Z;
+  if (v) {
+    m_statePWR_MGMT_2 |= accumulate;
+  } else {
+    m_statePWR_MGMT_2 &= ~accumulate;
+  }    
+  uint8_t data[] = {REG_PWR_MGMT_2, m_statePWR_MGMT_2};
+
+  esp_err_t r =
+      i2c_master_transmit(m_handle, data, 2, 1000 / portTICK_PERIOD_MS);
+
+  return r;
+}
+
+esp_err_t Mpu::disableAcc(bool v, uint8_t flags) {
+  uint8_t accumulate = 0x0;
+  if (flags & mpu::disableAxis::ACC_X)
+    accumulate |= mpu::disableAxis::ACC_X;
+  if (flags & mpu::disableAxis::ACC_Y)
+    accumulate |= mpu::disableAxis::ACC_Y;
+  if (flags & mpu::disableAxis::ACC_Z)
+    accumulate |= mpu::disableAxis::ACC_Z;  
+  if (v) {
+    m_statePWR_MGMT_2 |= accumulate;
+  } else {
+    m_statePWR_MGMT_2 &= ~accumulate;
+  }      
+  uint8_t data[] = {REG_PWR_MGMT_2, m_statePWR_MGMT_2};
+
+  esp_err_t r =
+    i2c_master_transmit(m_handle, data, 2, 1000 / portTICK_PERIOD_MS);
+
+  return r;
+}
+
+esp_err_t Mpu::getRawTemp(int16_t *out) {
+  uint8_t buf[2];
+  uint8_t reg = REG_TEMP_OUT_H;
+  
+  esp_err_t r = i2c_master_transmit_receive(m_handle, &reg, 1, buf, 2,
+                                            1000 / portTICK_PERIOD_MS);
+  if (r != ESP_OK)
+    return r;
+
+  *out = int16_t((buf[0] << 8) | buf[1]);
+
+  return ESP_OK;
+}
+
+float Mpu::getTemp() {
+  int16_t o;
+  getRawTemp(&o);
+  return (o / 340) + 36.53f;
 }
