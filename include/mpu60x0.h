@@ -1,11 +1,14 @@
 #ifndef MPU60X0_H
-#define MPU60x0_H
+#define MPU60X0_H
 
+#include <cstdint>
 #include <stdint.h>
 #include <array>
+#include <variant>
 #include "esp_err.h"
 #include "driver/i2c_master.h"
 #include "driver/i2c_types.h"
+#include "soft_i2c_master.h"
 
 namespace mpu {
 enum gyroScale { FS_250, FS_500, FS_1000, FS_2000 };
@@ -23,8 +26,11 @@ enum disableAxis {
 // enum class disableAccAxis { X = 0x20, Y = 0x10, Z = 0x08 };
 };
 
+class I2CDeviceHandle;
+
 class Mpu {
 private:
+  I2CDeviceHandle* m_i2cDeviceHandle;
   i2c_master_dev_handle_t m_handle;
   void* m_madgwickFilter;
   float m_gyroSens = 131.0f;	// LSB / deg/s
@@ -32,24 +38,31 @@ private:
   uint64_t m_lastUpdateTime = 0; // us
   float m_filterTargetDelay = 0;
   struct {
-    float x = -0.27f, y = 0.24f, z = 0.16f; // deg/s
+    float x = -0.27f, y = 0.24f, z = 0.16f; // raw
   } m_offsetGyro;
   struct {
-    float x = 0, y = 0, z = 0;	// g
+    float x = 0, y = 0, z = 0;	// raw
   } m_offsetAcc;
+  struct {
+    int16_t gyroX = 0, gyroY = 0, gyroZ = 0;
+    int16_t accX = 0, accY = 0, accZ = 0;    
+  } m_firstOrderIIR;
   uint8_t m_statePWR_MGMT_1 = 0x0;
   uint8_t m_statePWR_MGMT_2 = 0x0;
 
   float convertGyro(int16_t in);
   float convertAcc(int16_t in);
+  int16_t firstOrderIIR(int16_t in, int16_t& prev, float alpha = 0.5f);
 public:
   Mpu(i2c_master_bus_handle_t masterBusHandle, uint32_t masterFreq = 400000,
       bool useAlternativeAddr = false, float filterPollFreqs = 512.0f,
-      float filterBeta = 0.1f);
+      float filterBeta = 0.5f);
+  Mpu(soft_i2c_master_bus_t masterBusHandle, uint32_t masterFreq = 400000,
+      bool useAlternativeAddr = false, float filterPollFreqs = 512.0f,
+      float filterBeta = 0.5f);
   ~Mpu();
 
 
-  
   void calibrate();
   void update();
   esp_err_t reset();
