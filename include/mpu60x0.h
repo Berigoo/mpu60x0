@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <stdint.h>
 #include <array>
-#include <variant>
 #include "esp_err.h"
 #include "driver/i2c_master.h"
 #include "driver/i2c_types.h"

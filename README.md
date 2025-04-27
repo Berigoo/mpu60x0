@@ -19,7 +19,12 @@ Software I2C with roll-pitch calculation using Madgwick Filter.
   
 - **Configuration Options**:
   - Adjustable accelerometer scale range
-  - Adjustable gyroscope scale range 
+  - Adjustable gyroscope scale range
+  - Disable specific axis
+  
+- **Several Modes**
+  - Cycle Mode
+  - Sleep Mode
 
 ## Installation
 
