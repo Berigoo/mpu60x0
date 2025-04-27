@@ -22,18 +22,6 @@ static void init(i2c_master_bus_handle_t* out) {
   ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_mst_config, out));    
 }
 
-TEST_CASE("Init", "[mpu]") {
-  i2c_master_bus_handle_t bus_handle;
-  init(&bus_handle);
-  
-  {
-    Mpu mpu(bus_handle);
-    TEST_ASSERT_NOT_EQUAL(nullptr, mpu.getHandle());
-  }
-
-  i2c_del_master_bus(bus_handle);
-};
-
 TEST_CASE("PROBING", "[mpu]") {
   i2c_master_bus_handle_t bus_handle;
   init(&bus_handle);
@@ -55,9 +43,9 @@ TEST_CASE("GYRO", "[mpu]") {
   
   {
     Mpu mpu(bus_handle);
-    std::array<int16_t, 3> out = {-1, -1, -1};
-    TEST_ASSERT_EQUAL(ESP_OK, mpu.getRawGyro(&out));
-    ESP_LOGI("mpu", "out: %d, %d, %d", out[0], out[1], out[2]);
+    std::array<float, 3> out = {-1, -1, -1};
+    TEST_ASSERT_EQUAL(ESP_OK, mpu.getGyro(&out));
+    ESP_LOGI("mpu", "out: %f, %f, %f", out[0], out[1], out[2]);
   }
 
   i2c_del_master_bus(bus_handle);
@@ -69,12 +57,33 @@ TEST_CASE("ACC", "[mpu]") {
   
   {
     Mpu mpu(bus_handle);
-    std::array<int16_t, 3> out = {-1, -1, -1};
-    TEST_ASSERT_EQUAL(ESP_OK, mpu.getRawAcc(&out));
-    ESP_LOGI("mpu", "out: %d, %d, %d", out[0], out[1], out[2]);
+    std::array<float, 3> out = {-1, -1, -1};
+    TEST_ASSERT_EQUAL(ESP_OK, mpu.getAcc(&out));
+    ESP_LOGI("mpu", "out: %f, %f, %f", out[0], out[1], out[2]);
   }
 
   i2c_del_master_bus(bus_handle);
+}
+
+TEST_CASE("CYCLE MODE", "[mpu]"){
+  i2c_master_bus_handle_t bus_handle;
+  init(&bus_handle);
+  
+  {
+    Mpu mpu(bus_handle);
+    TEST_ASSERT_EQUAL(ESP_OK, mpu.enableSleepMode(true));
+    vTaskDelay(200 / portTICK_PERIOD_MS);
+    float o;
+    mpu.getTemp(&o);
+    float staleVal = o;
+    TEST_ASSERT_EQUAL(ESP_OK, mpu.enableSleepMode(false));
+    TEST_ASSERT_EQUAL(ESP_OK, mpu.enableCycleMode(true));
+    vTaskDelay(200 / portTICK_PERIOD_MS);
+    mpu.getTemp(&o);
+    TEST_ASSERT(o != 0 || o != staleVal);
+  }
+
+  i2c_del_master_bus(bus_handle);  
 }
 
 TEST_CASE("LOW MODE", "[mpu]") {
@@ -85,14 +94,13 @@ TEST_CASE("LOW MODE", "[mpu]") {
     Mpu mpu(bus_handle);
     TEST_ASSERT_EQUAL(ESP_OK,
                       mpu.enableLowPowerMode(mpu::wakeupFreq::FS_20_HZ));
-    TEST_ASSERT_EQUAL(ESP_OK, mpu.enableCycleMode(false));
+    vTaskDelay(200 / portTICK_PERIOD_MS);
+    float o;
+    mpu.getTemp(&o);
+    float staleVal = o;
     TEST_ASSERT_EQUAL(ESP_OK, mpu.disableTemp(true));
     vTaskDelay(200 / portTICK_PERIOD_MS);
-    int16_t o;
-    mpu.getRawTemp(&o);
-    int16_t staleVal = o;
-    vTaskDelay(200 / portTICK_PERIOD_MS);
-    mpu.getRawTemp(&o);
+    mpu.getTemp(&o);
     TEST_ASSERT(o == 0 || o == staleVal);
   }
 
@@ -107,15 +115,15 @@ TEST_CASE("SLEEP MODE", "[mpu]") {
     Mpu mpu(bus_handle);
     mpu.enableSleepMode(true);
     vTaskDelay(200 / portTICK_PERIOD_MS);
-    std::array<int16_t, 3> out;
-    mpu.getRawGyro(&out);
-    int16_t staleVal = out[0];
+    std::array<float, 3> out;
+    mpu.getGyro(&out);
+    float staleVal = out[0];
     vTaskDelay(200 / portTICK_PERIOD_MS);
-    mpu.getRawGyro(&out);
+    mpu.getGyro(&out);
     TEST_ASSERT(out[0] == staleVal || out[0] == 0);
     mpu.enableSleepMode(false);
     vTaskDelay(200 / portTICK_PERIOD_MS);
-    mpu.getRawGyro(&out);
+    mpu.getGyro(&out);
     TEST_ASSERT(!(out[0] == staleVal || out[0] == 0));
     
   }
@@ -132,11 +140,11 @@ TEST_CASE("DISABLE GYRO AXIS", "[mpu]") {
     mpu.disableGyro(true, mpu::disableAxis::GYRO_X | mpu::disableAxis::GYRO_Y |
                               mpu::disableAxis::GYRO_Z);
     vTaskDelay(200 / portTICK_PERIOD_MS);
-    std::array<int16_t, 3> staleVal;
-    mpu.getRawGyro(&staleVal);
+    std::array<float, 3> staleVal;
+    mpu.getGyro(&staleVal);
     vTaskDelay(200 / portTICK_PERIOD_MS);
-    std::array<int16_t, 3> val;
-    mpu.getRawGyro(&val);
+    std::array<float, 3> val;
+    mpu.getGyro(&val);
     TEST_ASSERT((val[0] == staleVal[0] && val[1] == staleVal[1] &&
                  val[2] == staleVal[2]) ||
                 (val[0] == 0 && val[1] == 0 && val[2] == 0));
@@ -154,11 +162,11 @@ TEST_CASE("DISABLE ACC AXIS", "[mpu]") {
     mpu.disableAcc(true, mpu::disableAxis::ACC_X | mpu::disableAxis::ACC_Y |
                               mpu::disableAxis::ACC_Z);
     vTaskDelay(200 / portTICK_PERIOD_MS);
-    std::array<int16_t, 3> staleVal;
-    mpu.getRawAcc(&staleVal);
+    std::array<float, 3> staleVal;
+    mpu.getAcc(&staleVal);
     vTaskDelay(200 / portTICK_PERIOD_MS);
-    std::array<int16_t, 3> val;
-    mpu.getRawAcc(&val);
+    std::array<float, 3> val;
+    mpu.getAcc(&val);
     TEST_ASSERT((val[0] == staleVal[0] && val[1] == staleVal[1] &&
                  val[2] == staleVal[2]) ||
                 (val[0] == 0 && val[1] == 0 && val[2] == 0));

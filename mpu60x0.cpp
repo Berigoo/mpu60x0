@@ -42,7 +42,7 @@ Mpu::Mpu(i2c_master_bus_handle_t masterBusHandle, uint32_t masterFreq,
   calibrate();
 }
 
-Mpu::Mpu(soft_i2c_master_bus_t masterBusHandle, uint32_t masterFreq,
+Mpu::Mpu(soft_i2c_master_bus_t masterBusHandle, 
 	 bool useAlternativeAddr, float filterPollFreqs,
 	 float filterBeta) {
   uint16_t addr = (useAlternativeAddr) ? MPU60X0_ADDR1 : MPU60X0_ADDR0;
@@ -75,7 +75,7 @@ Mpu::~Mpu() {
 };
 
 
-esp_err_t Mpu::getRawGyro(std::array<int16_t, 3> *out) {
+esp_err_t Mpu::rawGyro(std::array<int16_t, 3> *out) {
   uint8_t buf[6];
   uint8_t reg = REG_GYRO_XOUT_H;
   
@@ -89,6 +89,18 @@ esp_err_t Mpu::getRawGyro(std::array<int16_t, 3> *out) {
   out->at(2) = int16_t((buf[4] << 8) | buf[5]);
   
   return ESP_OK;    
+};
+
+esp_err_t Mpu::getGyro(std::array<float, 3> *out) {
+  std::array<int16_t, 3> tmp;
+  esp_err_t r = rawGyro(&tmp);
+  out->at(0) = convertGyro(
+			   tmp.at(0) - m_offsetGyro.x);
+  out->at(1) = convertGyro(
+			   tmp.at(1) - m_offsetGyro.y);
+  out->at(2) = convertGyro(
+			   tmp.at(2) - m_offsetGyro.z);
+  return r;
 };
 
 esp_err_t Mpu::setGyroScale(mpu::gyroScale scale) {
@@ -169,8 +181,8 @@ void Mpu::calibrate(){
   for (int i = 0; i < samples; i++) {
     std::array<int16_t, 3> g;
     std::array<int16_t, 3> a;
-    ESP_ERROR_CHECK(getRawGyro(&g));
-    ESP_ERROR_CHECK(getRawGyro(&a));
+    ESP_ERROR_CHECK(rawGyro(&g));
+    ESP_ERROR_CHECK(rawGyro(&a));
 
     sumGyroX += g[0];
     sumGyroY += g[1];
@@ -201,11 +213,11 @@ void Mpu::update() {
   if (dt < m_filterTargetDelay)
     return;
 
-  if (!(m_statePWR_MGMT_2 & 0x4F)){
+  if (!(m_statePWR_MGMT_2 & 0x4F) && !(m_statePWR_MGMT_1 & 0x20)){
     std::array<int16_t, 3> g;
     std::array<int16_t, 3> a;
-    getRawGyro(&g);
-    getRawAcc(&a);
+    rawGyro(&g);
+    rawAcc(&a);
 
     float gx = convertGyro(
         firstOrderIIR(g[0] - m_offsetGyro.x, m_firstOrderIIR.gyroX));
@@ -233,7 +245,7 @@ void Mpu::update() {
   m_lastUpdateTime = now_us;
 }
 
-esp_err_t Mpu::getRawAcc(std::array<int16_t, 3> *out) {
+esp_err_t Mpu::rawAcc(std::array<int16_t, 3> *out) {
   uint8_t buf[6];
   uint8_t reg = REG_ACCEL_XOUT_H;
 
@@ -247,6 +259,18 @@ esp_err_t Mpu::getRawAcc(std::array<int16_t, 3> *out) {
   out->at(2) = int16_t((buf[4] << 8) | buf[5]);
   
   return ESP_OK;
+}
+
+esp_err_t Mpu::getAcc(std::array<float, 3> *out) {
+  std::array<int16_t, 3> tmp;
+  esp_err_t r = rawAcc(&tmp);
+  out->at(0) = convertAcc(
+			 tmp.at(0) - m_offsetAcc.x);
+  out->at(1) = convertAcc(
+			 tmp.at(1) - m_offsetAcc.y);
+  out->at(2) = convertAcc(
+			 tmp.at(2) - m_offsetAcc.z);
+  return r;
 }
 
 float Mpu::getRoll(){
@@ -267,6 +291,7 @@ esp_err_t Mpu::enableCycleMode(bool v) {
   } else {
     m_statePWR_MGMT_1 &= ~PWR_MGMT_CYCLE_MODE;
   }
+  ESP_LOGI("mpu", "cycle mode: %02x", m_statePWR_MGMT_1);
   uint8_t data[] = {REG_PWR_MGMT_1, m_statePWR_MGMT_1};
   
   esp_err_t r =
@@ -389,7 +414,7 @@ esp_err_t Mpu::disableAcc(bool v, uint8_t flags) {
   return r;
 }
 
-esp_err_t Mpu::getRawTemp(int16_t *out) {
+esp_err_t Mpu::getTemp(float *out) {
   uint8_t buf[2];
   uint8_t reg = REG_TEMP_OUT_H;
 
@@ -398,15 +423,9 @@ esp_err_t Mpu::getRawTemp(int16_t *out) {
   if (r != ESP_OK)
     return r;
 
-  *out = int16_t((buf[0] << 8) | buf[1]);
+  *out = int16_t((buf[0] << 8) | buf[1]) / 340.0f;
 
   return ESP_OK;
-}
-
-float Mpu::getTemp() {
-  int16_t o;
-  getRawTemp(&o);
-  return (o / 340.0f) /* + 36.53f */;
 }
 
 int16_t Mpu::firstOrderIIR(int16_t in, int16_t& prev, float alpha) {
