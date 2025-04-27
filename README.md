@@ -25,7 +25,7 @@ Software I2C with roll-pitch calculation using Madgwick Filter.
 
 1. clone this repository into your project's `components` directory.
 ```shell
-git clone https://github.com/Berigoo/mpu60x0.git components
+git clone https://github.com/Berigoo/mpu60x0.git 
 ```
 2. Modify project root `CMakeLists.txt` (if not yet)
 ```CMake

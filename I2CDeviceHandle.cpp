@@ -3,7 +3,9 @@
 #include "esp_err.h"
 #include "freertos/FreeRTOS.h"
 #include "portmacro.h"
+#ifndef CONFIG_IDF_TARGET_ESP32
 #include "soft_i2c_master.h"
+#endif
 #include <cstdint>
 
 
@@ -32,7 +34,7 @@ HardI2C::~HardI2C() {
 }
 
 
-
+#ifndef CONFIG_IDF_TARGET_ESP32
 esp_err_t SoftI2C::transmit(const uint8_t *data, size_t size) {
   return soft_i2c_master_write(m_bus, m_deviceAddr, data, size);
 }
@@ -44,7 +46,7 @@ esp_err_t SoftI2C::transmitReceive(const uint8_t *data, size_t size,
   return soft_i2c_master_write_read(m_bus, m_deviceAddr, data, size, buffer,
                                     readSize);
 }
-
+#endif
 
 
 

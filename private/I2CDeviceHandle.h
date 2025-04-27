@@ -4,7 +4,9 @@
 #include "driver/i2c_types.h"
 #include "esp_err.h"
 #include "driver/i2c_master.h"
+#ifndef CONFIG_IDF_TARGET_ESP32
 #include "../include/soft_i2c_master.h"
+#endif
 #include <cstdint>
 
 class I2CDeviceHandle {
@@ -30,6 +32,7 @@ class HardI2C : public I2CDeviceHandle {
 			    uint8_t *buffer, size_t readSize) override;
 };
 
+#ifndef CONFIG_IDF_TARGET_ESP32
 class SoftI2C : public I2CDeviceHandle {
  private:
   soft_i2c_master_bus_t m_bus;
@@ -45,5 +48,6 @@ class SoftI2C : public I2CDeviceHandle {
   esp_err_t transmitReceive(const uint8_t *data, size_t size,
 			    uint8_t *buffer, size_t readSize) override;  
 };
+#endif
 
 #endif  // I2CDEVICEHANDLE_H
