@@ -6,7 +6,7 @@ Software I2C with roll-pitch calculation using Madgwick Filter.
 ## Features
 - **Dual I2C Support**:
   - Hardware I2C (using ESP32's I2C peripherals)
-  - Software I2C (bit-banged implementation)
+  - Software I2C (bit-banged implementation) (only chip with dedicated gpio supported)
   
 - **Sensor Data Reading**:
   - scaled accelerometer data (X, Y, Z)
