@@ -1,18 +1,29 @@
 # MPU60x0
-Object oriented library for interfacing with Mpu-6050 and
-Mpu-6000 using ESP-IDF framework. Support both Hardware I2C and
-Software I2C. Also Roll-Pitch calculation using Madgwick Filter.
+Object-oriented library for interfacing with MPU-6050 and
+MPU-6000 using ESP-IDF framework. Supports both Hardware I2C and
+Software I2C with roll-pitch calculation using Madgwick Filter.
 
 ## Features
-- Support Hard and Soft I2C
-- Read acceleration and gyroscope data
-- Read roll and pitch data
-- Set scale range for accelerometer and gyroscope
-- Set several madgwick filter variables
+- **Dual I2C Support**:
+  - Hardware I2C (using ESP32's I2C peripherals)
+  - Software I2C (bit-banged implementation)
+  
+- **Sensor Data Reading**:
+  - scaled accelerometer data (X, Y, Z)
+  - scaled gyroscope data (X, Y, Z)
+  - Temperature readings
+  
+- **Orientation Calculation**:
+  - Roll and pitch estimation using Madgwick Filter
+  - Configurable filter parameters
+  
+- **Configuration Options**:
+  - Adjustable accelerometer scale range
+  - Adjustable gyroscope scale range 
 
-## Instalation
+## Installation
 
-1. clone this repository into your `components` directory. Assume you are in your project root directory,
+1. clone this repository into your project's `components` directory.
 ```shell
 git clone https://github.com/Berigoo/mpu60x0.git components
 ```
@@ -22,7 +33,7 @@ git clone https://github.com/Berigoo/mpu60x0.git components
 set(EXTRA_COMPONENT_DIRS components)
 #...
 ```
-3. Addd the component
+3. Add the component
 ```Cmake
 idf_component_register(SRCS "example.cpp"
                     INCLUDE_DIRS "."
