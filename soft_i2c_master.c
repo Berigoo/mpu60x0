@@ -3,7 +3,6 @@
  *
  * SPDX-License-Identifier: CC0-1.0
  */
-#ifndef CONFIG_IDF_TARGET_ESP32
 
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
@@ -347,5 +346,3 @@ static esp_err_t emulate_i2c_transfer(uint8_t device_address,
 
     return ret;
 }
-
-#endif

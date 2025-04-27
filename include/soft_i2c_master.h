@@ -6,8 +6,6 @@
 
 #pragma once
 
-#ifndef CONFIG_IDF_TARGET_ESP32
-
 #include <stdint.h>
 #include "esp_err.h"
 
@@ -102,6 +100,4 @@ esp_err_t soft_i2c_master_write_read(soft_i2c_master_bus_t bus,
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif
