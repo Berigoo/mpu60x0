@@ -8,7 +8,9 @@
 #include "esp_err.h"
 #include "driver/i2c_master.h"
 #include "driver/i2c_types.h"
+#ifndef CONFIG_IDF_TARGET_ESP32
 #include "soft_i2c_master.h"
+#endif
 
 namespace mpu {
 enum gyroScale { FS_250, FS_500, FS_1000, FS_2000 };
@@ -67,6 +69,7 @@ public:
   Mpu(i2c_master_bus_handle_t masterBusHandle, uint32_t masterFreq = 400000,
       bool useAlternativeAddr = false, float filterPollFreqs = 512.0f,
       float filterBeta = 0.5f);
+#ifndef CONFIG_IDF_TARGET_ESP32  
    /**
    * @brief construct Mpu class with Software I2C bus
    *
@@ -77,6 +80,7 @@ public:
    */
   Mpu(soft_i2c_master_bus_t masterBusHandle, bool useAlternativeAddr = false,
       float filterPollFreqs = 512.0f, float filterBeta = 0.5f);
+#endif  
   ~Mpu();
 
   void calibrate();

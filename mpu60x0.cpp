@@ -13,7 +13,9 @@
 #include <cstdint>
 #include "esp_timer.h"
 #include "esp_log.h"
+#ifndef CONFIG_IDF_TARGET_ESP32
 #include "soft_i2c_master.h"
+#endif
 
 Mpu::Mpu(i2c_master_bus_handle_t masterBusHandle, uint32_t masterFreq,
 	 bool useAlternativeAddr, float filterPollFreqs,
@@ -41,7 +43,7 @@ Mpu::Mpu(i2c_master_bus_handle_t masterBusHandle, uint32_t masterFreq,
       m_i2cDeviceHandle->transmit(data, 2));
   calibrate();
 }
-
+#ifndef CONFIG_IDF_TARGET_ESP32
 Mpu::Mpu(soft_i2c_master_bus_t masterBusHandle, 
 	 bool useAlternativeAddr, float filterPollFreqs,
 	 float filterBeta) {
@@ -68,6 +70,7 @@ Mpu::Mpu(soft_i2c_master_bus_t masterBusHandle,
       m_i2cDeviceHandle->transmit(data, 2));
   calibrate();
 }
+#endif
 
 Mpu::~Mpu() {
   delete m_i2cDeviceHandle;
